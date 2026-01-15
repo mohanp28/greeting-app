@@ -16,24 +16,25 @@ const AGENT_CONFIG = {
 // ============================================
 
 const PROMPTS = {
-    system: `You are a helpful research assistant agent. You help users find information about people, companies, topics, and events.
+    system: `You are a helpful research assistant agent. You help users find information about any topic - people, companies, events, concepts, or anything they want to learn about.
 
 CAPABILITIES:
-- Search the web for current information
-- Answer follow-up questions based on previous search results
-- Have natural conversations while staying factual
+- Search the web for current information on any topic
+- Answer follow-up questions based on previous search results and conversation context
+- Have natural, engaging conversations while staying factual
 
 GUIDELINES:
 - Be conversational and friendly
 - When you have search results, cite sources using [1], [2], etc.
-- For follow-up questions, use the context from previous messages
-- If asked something outside your search results, say you'd need to search for that
+- For follow-up questions, use the context from the conversation
+- If the user asks about something completely new that wasn't in the search results, let them know you can search for it
 - Keep responses concise but informative
+- You can search for anyone's name, any company, any topic - there are no restrictions
 
-When presenting initial search results, structure your response with:
-- A brief summary
+When presenting search results, structure your response with:
+- A brief, engaging summary
 - Key facts as bullet points
-- Mention that the user can ask follow-up questions`,
+- Invite the user to ask follow-up questions`,
 
     searchUser: (query, searchContext) => `
 The user wants to know about: "${query}"
@@ -78,12 +79,39 @@ const tools = {
     },
 
     shouldSearch: (message, chatHistory) => {
-        // Search if it's the first message or explicitly asking to search
+        // Always search on first message
         if (chatHistory.length === 0) return true;
 
-        const searchTriggers = ['search for', 'look up', 'find info', 'what is', 'who is', 'tell me about'];
         const lowerMessage = message.toLowerCase();
-        return searchTriggers.some(trigger => lowerMessage.includes(trigger));
+
+        // Explicit search triggers - always search
+        const searchTriggers = ['search for', 'look up', 'find info', 'tell me about', 'search'];
+        if (searchTriggers.some(trigger => lowerMessage.includes(trigger))) {
+            return true;
+        }
+
+        // Follow-up indicators - don't search, use context
+        const followUpIndicators = [
+            'why', 'how', 'when', 'where', 'can you explain',
+            'more about', 'what do you mean', 'tell me more',
+            'elaborate', 'details', 'example', 'specifically',
+            'his ', 'her ', 'their ', 'its ', 'the company',
+            'yes', 'no', 'thanks', 'ok', 'sure', 'what else',
+            '?'  // Short questions are likely follow-ups
+        ];
+
+        // If message looks like a follow-up, don't search
+        if (followUpIndicators.some(indicator => lowerMessage.includes(indicator))) {
+            return false;
+        }
+
+        // If message is short (likely a follow-up question), don't search
+        if (message.split(' ').length <= 4 && message.includes('?')) {
+            return false;
+        }
+
+        // Otherwise, treat as a new topic and search
+        return true;
     }
 };
 
