@@ -94,7 +94,7 @@ async function getEmbedding(openai, text) {
 
 async function parsePDF(buffer) {
     const data = await pdf(buffer);
-    return data.text;
+    return data; // Returns { text, numpages, info, etc. }
 }
 
 // ============================================
@@ -180,21 +180,44 @@ module.exports = async function (context, req) {
             let text = '';
             let filename = 'document.txt';
 
-            if (contentType.includes('application/pdf') || contentType.includes('multipart/form-data')) {
-                // Handle PDF or form upload
-                const buffer = Buffer.from(req.body);
-                text = await parsePDF(buffer);
+            console.log('Content-Type:', contentType);
+            console.log('Body type:', typeof req.body);
+            console.log('Body length:', req.body ? req.body.length : 0);
+
+            if (contentType.includes('application/pdf')) {
+                // Handle PDF upload
+                try {
+                    const buffer = Buffer.from(req.body);
+                    console.log('PDF buffer size:', buffer.length);
+                    const pdfData = await parsePDF(buffer);
+                    text = pdfData.text || '';
+                    console.log('Extracted PDF text length:', text.length);
+                } catch (pdfError) {
+                    console.error('PDF parsing error:', pdfError.message);
+                    context.res = {
+                        status: 400,
+                        body: { error: 'Failed to parse PDF: ' + pdfError.message + '. Try uploading a text file instead.' }
+                    };
+                    return;
+                }
                 filename = req.query.filename || 'document.pdf';
             } else if (contentType.includes('application/json')) {
                 // Handle JSON with text content
-                const body = req.body;
+                const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
                 text = body.content || '';
                 filename = body.filename || 'document.txt';
+                console.log('JSON content length:', text.length);
             } else {
                 // Handle plain text
-                text = typeof req.body === 'string' ? req.body : req.body.toString();
+                text = typeof req.body === 'string' ? req.body : (req.body ? req.body.toString() : '');
                 filename = req.query.filename || 'document.txt';
+                console.log('Plain text length:', text.length);
             }
+
+            // Clean up text
+            text = text.replace(/\s+/g, ' ').trim();
+            console.log('Cleaned text length:', text.length);
+            console.log('First 200 chars:', text.substring(0, 200));
 
             if (!text || text.length < 10) {
                 context.res = {
