@@ -34,6 +34,26 @@
             font-size: 13px;
         }
         .header-btn:hover { background: rgba(255,255,255,0.25); }
+        .header-btn.active { background: rgba(255,255,255,0.35); }
+
+        /* Tab styles */
+        .tabs {
+            display: flex;
+            background: #005a9e;
+        }
+        .tab {
+            padding: 10px 20px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+        }
+        .tab:hover { color: white; }
+        .tab.active { color: white; border-bottom-color: white; }
+        .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .tab-content.active { display: flex; }
 
         .chat-container {
             flex: 1;
@@ -222,21 +242,126 @@
             border-radius: 10px;
             margin-left: 8px;
         }
+
+        /* Research tab styles */
+        .research-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .research-input-container {
+            background: white;
+            border-top: 1px solid #ddd;
+            padding: 16px 20px;
+        }
+        .company-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .company-card h3 {
+            color: #0078d4;
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+        .company-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .company-info-item {
+            background: #f5f7fa;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .company-info-item label {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .company-info-item span {
+            font-size: 14px;
+            color: #333;
+        }
+        .company-description {
+            color: #555;
+            line-height: 1.6;
+            border-top: 1px solid #eee;
+            padding-top: 16px;
+        }
+        .workflow-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        .research-welcome {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .research-welcome h2 { color: #333; margin-bottom: 12px; }
+        .research-welcome p { margin-bottom: 8px; }
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #999;
+        }
+        .step.active { color: #0078d4; }
+        .step.complete { color: #4caf50; }
+        .step-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .step.active .step-number { background: #0078d4; color: white; }
+        .step.complete .step-number { background: #4caf50; color: white; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-left">
-            <h1>Search Agent</h1>
-            <p>Web search + Your documents (RAG)</p>
+            <h1>AI Agent Hub</h1>
+            <p>Search + RAG + Company Research</p>
         </div>
         <div class="header-actions">
             <button class="header-btn" onclick="openDocModal()">📄 Documents</button>
-            <button class="header-btn" onclick="clearChat()">New Chat</button>
+            <button class="header-btn" onclick="clearChat()">Clear</button>
         </div>
     </div>
 
-    <div class="chat-container" id="chatContainer">
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('chat')">💬 Chat Agent</button>
+        <button class="tab" onclick="switchTab('research')">🔍 Research Agent</button>
+    </div>
+
+    <!-- Chat Tab -->
+    <div class="tab-content active" id="chatTab">
+        <div class="chat-container" id="chatContainer">
         <div class="welcome" id="welcome">
             <h2>Hello! I'm your Search Agent</h2>
             <p>I can search the web AND your uploaded documents. Try asking:</p>
@@ -248,11 +373,35 @@
         </div>
     </div>
 
-    <div class="input-container">
-        <form class="input-wrapper" id="chatForm">
-            <input type="text" id="messageInput" placeholder="Ask anything..." autocomplete="off" required>
-            <button type="submit" id="sendBtn">Send</button>
-        </form>
+        <div class="input-container">
+            <form class="input-wrapper" id="chatForm">
+                <input type="text" id="messageInput" placeholder="Ask anything..." autocomplete="off" required>
+                <button type="submit" id="sendBtn">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Research Tab -->
+    <div class="tab-content" id="researchTab">
+        <div class="research-container" id="researchContainer">
+            <div class="research-welcome" id="researchWelcome">
+                <h2>🔍 Company Research Agent</h2>
+                <p>Powered by OpenAI Agent Builder Workflow</p>
+                <div class="workflow-badge">wf_69692eed96408190ae45fa67ca337c22087d366e89592a85</div>
+                <p style="margin-top:20px;color:#333;">Enter a company name to research:</p>
+                <div class="suggestions" style="margin-top:12px;">
+                    <span class="suggestion" onclick="runResearch('Microsoft')">Microsoft</span>
+                    <span class="suggestion" onclick="runResearch('Tesla')">Tesla</span>
+                    <span class="suggestion" onclick="runResearch('OpenAI')">OpenAI</span>
+                </div>
+            </div>
+        </div>
+        <div class="research-input-container">
+            <form class="input-wrapper" id="researchForm">
+                <input type="text" id="researchInput" placeholder="Enter company name to research..." autocomplete="off" required>
+                <button type="submit" id="researchBtn">Research</button>
+            </form>
+        </div>
     </div>
 
     <!-- Document Upload Modal -->
@@ -509,6 +658,140 @@
         }
 
         input.focus();
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            if (tabName === 'chat') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('chatTab').classList.add('active');
+                input.focus();
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('researchTab').classList.add('active');
+                document.getElementById('researchInput').focus();
+            }
+        }
+
+        // Research Agent functionality
+        const researchForm = document.getElementById('researchForm');
+        const researchInput = document.getElementById('researchInput');
+        const researchBtn = document.getElementById('researchBtn');
+        const researchContainer = document.getElementById('researchContainer');
+
+        function runResearch(query) {
+            researchInput.value = query;
+            researchForm.dispatchEvent(new Event('submit'));
+        }
+
+        function showResearchProgress() {
+            const welcome = document.getElementById('researchWelcome');
+            if (welcome) welcome.style.display = 'none';
+
+            researchContainer.innerHTML = `
+                <div style="text-align:center;padding:40px;">
+                    <div class="step-indicator">
+                        <div class="step active" id="step1">
+                            <span class="step-number">1</span>
+                            <span>Web Research Agent</span>
+                        </div>
+                        <div class="step" id="step2">
+                            <span class="step-number">2</span>
+                            <span>Summarize & Display</span>
+                        </div>
+                    </div>
+                    <div class="typing-indicator" style="justify-content:center;margin-top:30px;">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <p style="color:#666;margin-top:20px;">Researching company information...</p>
+                </div>
+            `;
+        }
+
+        function displayResearchResults(data) {
+            let html = `
+                <div class="workflow-badge" style="margin-bottom:20px;">
+                    Workflow: ${data.workflowId}
+                </div>
+            `;
+
+            if (data.companies && data.companies.length > 0) {
+                for (const company of data.companies) {
+                    html += `
+                        <div class="company-card">
+                            <h3>${company.company_name}</h3>
+                            <div class="company-info">
+                                <div class="company-info-item">
+                                    <label>Industry</label>
+                                    <span>${company.industry}</span>
+                                </div>
+                                <div class="company-info-item">
+                                    <label>Headquarters</label>
+                                    <span>${company.headquarters_location}</span>
+                                </div>
+                                <div class="company-info-item">
+                                    <label>Company Size</label>
+                                    <span>${company.company_size}</span>
+                                </div>
+                                <div class="company-info-item">
+                                    <label>Website</label>
+                                    <span><a href="${company.website}" target="_blank">${company.website}</a></span>
+                                </div>
+                                <div class="company-info-item">
+                                    <label>Founded</label>
+                                    <span>${company.founded_year}</span>
+                                </div>
+                            </div>
+                            <div class="company-description">
+                                ${company.description}
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                html += `<p style="color:#666;text-align:center;">No company information found.</p>`;
+            }
+
+            researchContainer.innerHTML = html;
+        }
+
+        researchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = researchInput.value.trim();
+            if (!query) return;
+
+            researchBtn.disabled = true;
+            showResearchProgress();
+
+            try {
+                const response = await fetch('/api/research', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Research failed');
+                }
+
+                displayResearchResults(data);
+
+            } catch (error) {
+                researchContainer.innerHTML = `
+                    <div style="text-align:center;padding:40px;color:#f44336;">
+                        <p>Research failed: ${error.message}</p>
+                        <button class="header-btn" style="background:#0078d4;margin-top:20px;" onclick="location.reload()">Try Again</button>
+                    </div>
+                `;
+            } finally {
+                researchBtn.disabled = false;
+                researchInput.value = '';
+            }
+        });
     </script>
 </body>
 </html>
