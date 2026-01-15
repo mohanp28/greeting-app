@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search Agent</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
+            max-width: 700px;
+            margin: 40px auto;
             padding: 20px;
+            background: #f9f9f9;
         }
         h1 {
             text-align: center;
             color: #333;
+            margin-bottom: 30px;
         }
         .search-form {
             display: flex;
@@ -22,72 +25,145 @@
         }
         input {
             flex: 1;
-            padding: 12px;
+            padding: 14px;
             font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
         }
         button {
-            padding: 12px 24px;
+            padding: 14px 28px;
             font-size: 16px;
             background: #0078d4;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
         }
-        button:hover {
-            background: #106ebe;
+        button:hover { background: #106ebe; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+
+        #results { display: none; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
         }
-        #results {
-            display: none;
+        .name {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
         }
-        .greeting {
-            font-size: 18px;
-            color: #0078d4;
-            margin-bottom: 15px;
+        .category {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .notable {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #eee;
         }
         .summary {
-            background: #f5f5f5;
-            padding: 20px;
-            border-radius: 8px;
-            line-height: 1.6;
+            line-height: 1.7;
+            color: #444;
             margin-bottom: 20px;
         }
-        .sources {
-            border-top: 1px solid #ddd;
-            padding-top: 15px;
-        }
-        .sources h3 {
-            margin: 0 0 10px 0;
+        .section-title {
             font-size: 14px;
+            font-weight: 600;
             color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .key-facts {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+        .key-facts li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            color: #444;
+        }
+        .key-facts li:last-child { border-bottom: none; }
+        .key-facts li::before {
+            content: "•";
+            color: #0078d4;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .related-topics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .topic-tag {
+            background: #f5f5f5;
+            color: #666;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+        }
+        .sources {
+            border-top: 1px solid #eee;
+            padding-top: 16px;
         }
         .sources a {
             display: block;
             color: #0078d4;
             text-decoration: none;
-            padding: 5px 0;
+            padding: 6px 0;
             font-size: 14px;
         }
-        .sources a:hover {
-            text-decoration: underline;
+        .sources a:hover { text-decoration: underline; }
+        .agent-badge {
+            font-size: 11px;
+            color: #999;
+            text-align: right;
+            margin-top: 12px;
         }
         .error {
             color: #d32f2f;
             background: #ffebee;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 12px;
         }
         .loading {
             text-align: center;
             color: #666;
-            padding: 20px;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
         }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ddd;
+            border-top-color: #0078d4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -110,7 +186,7 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Searching...';
             results.style.display = 'block';
-            results.innerHTML = '<div class="loading">Searching and analyzing results...</div>';
+            results.innerHTML = '<div class="loading"><span class="spinner"></span>Agent is searching and analyzing...</div>';
 
             try {
                 const response = await fetch(`/api/hello?name=${encodeURIComponent(query)}`);
@@ -120,16 +196,33 @@
                     throw new Error(data.error || 'Search failed');
                 }
 
-                let html = `<div class="greeting">${data.message}</div>`;
-                html += `<div class="summary">${data.summary.replace(/\n/g, '<br>')}</div>`;
+                const r = data.response;
+                let html = `
+                <div class="card">
+                    <div class="header">
+                        <span class="name">${r.name}</span>
+                        <span class="category">${r.category}</span>
+                    </div>
+                    <div class="notable">${r.notableFor}</div>
+                    <div class="summary">${r.summary}</div>
 
-                if (data.sources && data.sources.length > 0) {
-                    html += '<div class="sources"><h3>Sources:</h3>';
-                    data.sources.forEach((source, i) => {
-                        html += `<a href="${source.url}" target="_blank">[${i + 1}] ${source.title}</a>`;
-                    });
-                    html += '</div>';
-                }
+                    <div class="section-title">Key Facts</div>
+                    <ul class="key-facts">
+                        ${r.keyFacts.map(fact => `<li>${fact}</li>`).join('')}
+                    </ul>
+
+                    <div class="section-title">Related Topics</div>
+                    <div class="related-topics">
+                        ${r.relatedTopics.map(topic => `<span class="topic-tag">${topic}</span>`).join('')}
+                    </div>
+
+                    <div class="sources">
+                        <div class="section-title">Sources</div>
+                        ${data.sources.map((s, i) => `<a href="${s.url}" target="_blank">[${i + 1}] ${s.title}</a>`).join('')}
+                    </div>
+
+                    <div class="agent-badge">Powered by ${data.agent}</div>
+                </div>`;
 
                 results.innerHTML = html;
 
