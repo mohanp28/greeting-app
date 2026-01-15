@@ -18,15 +18,28 @@ const indexSchema = {
     name: INDEX_NAME,
     fields: [
         { name: 'id', type: 'Edm.String', key: true, searchable: false },
-        { name: 'content', type: 'Edm.String', searchable: true, analyzer: 'standard.lucene' },
-        { name: 'embedding', type: 'Collection(Edm.Single)', searchable: true, dimensions: 1536, vectorSearchProfile: 'default-profile' },
+        { name: 'content', type: 'Edm.String', searchable: true, analyzerName: 'standard.lucene' },
+        {
+            name: 'embedding',
+            type: 'Collection(Edm.Single)',
+            searchable: true,
+            vectorSearchDimensions: 1536,
+            vectorSearchProfileName: 'default-profile'
+        },
         { name: 'filename', type: 'Edm.String', searchable: true, filterable: true },
         { name: 'chunkIndex', type: 'Edm.Int32', filterable: true },
         { name: 'uploadedAt', type: 'Edm.DateTimeOffset', filterable: true, sortable: true }
     ],
     vectorSearch: {
-        algorithms: [{ name: 'default-algorithm', kind: 'hnsw', parameters: { metric: 'cosine' } }],
-        profiles: [{ name: 'default-profile', algorithmConfigurationName: 'default-algorithm' }]
+        algorithms: [{
+            name: 'default-algorithm',
+            kind: 'hnsw',
+            hnswParameters: { metric: 'cosine' }
+        }],
+        profiles: [{
+            name: 'default-profile',
+            algorithmConfigurationName: 'default-algorithm'
+        }]
     }
 };
 
