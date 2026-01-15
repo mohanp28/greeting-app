@@ -1,51 +1,61 @@
 const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================
-// AGENT CONFIGURATION
+// PROMPT LOADER (supports local + Azure Blob)
 // ============================================
 
-const AGENT_CONFIG = {
-    name: 'SearchAgent',
-    model: 'gpt-4o',
-    temperature: 0.7,
-    maxTokens: 1000
-};
+class PromptLoader {
+    constructor() {
+        this.cache = null;
+        this.cacheTime = 0;
+        this.cacheTTL = 60000; // 1 minute cache
+    }
 
-// ============================================
-// PROMPT TEMPLATES
-// ============================================
+    async load() {
+        // Check cache
+        if (this.cache && (Date.now() - this.cacheTime) < this.cacheTTL) {
+            return this.cache;
+        }
 
-const PROMPTS = {
-    system: `You are a helpful research assistant agent. You help users find information about any topic - people, companies, events, concepts, or anything they want to learn about.
+        let promptConfig;
 
-CAPABILITIES:
-- Search the web for current information on any topic
-- Answer follow-up questions based on previous search results and conversation context
-- Have natural, engaging conversations while staying factual
+        // Try Azure Blob Storage first (for hot-reload)
+        if (process.env.PROMPT_BLOB_URL) {
+            try {
+                const response = await fetch(process.env.PROMPT_BLOB_URL);
+                if (response.ok) {
+                    promptConfig = await response.json();
+                    console.log('Loaded prompts from Azure Blob Storage');
+                }
+            } catch (error) {
+                console.warn('Failed to load from Blob, falling back to local:', error.message);
+            }
+        }
 
-GUIDELINES:
-- Be conversational and friendly
-- When you have search results, cite sources using [1], [2], etc.
-- For follow-up questions, use the context from the conversation
-- If the user asks about something completely new that wasn't in the search results, let them know you can search for it
-- Keep responses concise but informative
-- You can search for anyone's name, any company, any topic - there are no restrictions
+        // Fallback to local file
+        if (!promptConfig) {
+            const localPath = path.join(__dirname, '..', 'prompts', 'search-agent.json');
+            const fileContent = fs.readFileSync(localPath, 'utf-8');
+            promptConfig = JSON.parse(fileContent);
+            console.log('Loaded prompts from local file');
+        }
 
-When presenting search results, structure your response with:
-- A brief, engaging summary
-- Key facts as bullet points
-- Invite the user to ask follow-up questions`,
+        this.cache = promptConfig;
+        this.cacheTime = Date.now();
+        return promptConfig;
+    }
 
-    searchUser: (query, searchContext) => `
-The user wants to know about: "${query}"
+    // Template variable replacement
+    render(template, variables) {
+        return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+            return variables[key] !== undefined ? variables[key] : match;
+        });
+    }
+}
 
-Here are the search results:
-${searchContext}
-
-Provide a helpful, conversational response about "${query}" using these search results. Include key facts and cite sources.`,
-
-    followUpUser: (message) => `${message}`
-};
+const promptLoader = new PromptLoader();
 
 // ============================================
 // TOOLS (Agentic capabilities)
@@ -78,35 +88,24 @@ const tools = {
             .join('\n\n');
     },
 
-    shouldSearch: (message, chatHistory) => {
+    shouldSearch: (message, chatHistory, searchBehavior) => {
         // Always search on first message
         if (chatHistory.length === 0) return true;
 
         const lowerMessage = message.toLowerCase();
 
         // Explicit search triggers - always search
-        const searchTriggers = ['search for', 'look up', 'find info', 'tell me about', 'search'];
-        if (searchTriggers.some(trigger => lowerMessage.includes(trigger))) {
+        if (searchBehavior.explicitTriggers.some(trigger => lowerMessage.includes(trigger))) {
             return true;
         }
 
         // Follow-up indicators - don't search, use context
-        const followUpIndicators = [
-            'why', 'how', 'when', 'where', 'can you explain',
-            'more about', 'what do you mean', 'tell me more',
-            'elaborate', 'details', 'example', 'specifically',
-            'his ', 'her ', 'their ', 'its ', 'the company',
-            'yes', 'no', 'thanks', 'ok', 'sure', 'what else',
-            '?'  // Short questions are likely follow-ups
-        ];
-
-        // If message looks like a follow-up, don't search
-        if (followUpIndicators.some(indicator => lowerMessage.includes(indicator))) {
+        if (searchBehavior.followUpIndicators.some(indicator => lowerMessage.includes(indicator))) {
             return false;
         }
 
-        // If message is short (likely a follow-up question), don't search
-        if (message.split(' ').length <= 4 && message.includes('?')) {
+        // Short questions with ? are likely follow-ups
+        if (message.split(' ').length <= searchBehavior.maxShortQuestionWords && message.includes('?')) {
             return false;
         }
 
@@ -120,32 +119,34 @@ const tools = {
 // ============================================
 
 class ConversationalAgent {
-    constructor(openaiClient, config) {
+    constructor(openaiClient, config, prompts) {
         this.client = openaiClient;
         this.config = config;
+        this.prompts = prompts;
     }
 
-    async chat(userMessage, chatHistory, searchContext = null) {
+    async chat(userMessage, chatHistory, searchContext = null, promptLoader) {
         // Build messages array with history
         const messages = [
-            { role: 'system', content: PROMPTS.system }
+            { role: 'system', content: this.prompts.system }
         ];
 
-        // Add chat history (limit to last 10 exchanges to manage tokens)
+        // Add chat history (limit to last 20 messages)
         const recentHistory = chatHistory.slice(-20);
         messages.push(...recentHistory);
 
         // Add current user message with search context if available
         if (searchContext) {
-            messages.push({
-                role: 'user',
-                content: PROMPTS.searchUser(userMessage, searchContext)
+            const userPrompt = promptLoader.render(this.prompts.searchUser, {
+                query: userMessage,
+                searchContext: searchContext
             });
+            messages.push({ role: 'user', content: userPrompt });
         } else {
-            messages.push({
-                role: 'user',
-                content: PROMPTS.followUpUser(userMessage)
+            const userPrompt = promptLoader.render(this.prompts.followUpUser, {
+                message: userMessage
             });
+            messages.push({ role: 'user', content: userPrompt });
         }
 
         const completion = await this.client.chat.completions.create({
@@ -175,6 +176,18 @@ module.exports = async function (context, req) {
         return;
     }
 
+    // Load prompts (with caching)
+    let promptConfig;
+    try {
+        promptConfig = await promptLoader.load();
+    } catch (error) {
+        context.res = {
+            status: 500,
+            body: { error: 'Failed to load prompt configuration: ' + error.message }
+        };
+        return;
+    }
+
     // Support both GET (simple) and POST (with history)
     let message, chatHistory;
 
@@ -196,16 +209,16 @@ module.exports = async function (context, req) {
 
     try {
         const openai = new OpenAI({ apiKey: openaiApiKey });
-        const agent = new ConversationalAgent(openai, AGENT_CONFIG);
+        const agent = new ConversationalAgent(openai, promptConfig.config, promptConfig.prompts);
 
         let searchContext = null;
         let sources = [];
 
         // Determine if we need to search
-        const needsSearch = tools.shouldSearch(message, chatHistory);
+        const needsSearch = tools.shouldSearch(message, chatHistory, promptConfig.searchBehavior);
 
         if (needsSearch) {
-            // Extract search query (use message directly or parse it)
+            // Extract search query
             const searchQuery = message.replace(/^(search for|look up|find info about|tell me about|who is|what is)\s*/i, '');
 
             const searchData = await tools.webSearch(searchQuery, tavilyApiKey);
@@ -217,11 +230,12 @@ module.exports = async function (context, req) {
         }
 
         // Get agent response
-        const response = await agent.chat(message, chatHistory, searchContext);
+        const response = await agent.chat(message, chatHistory, searchContext, promptLoader);
 
         context.res = {
             body: {
-                agent: AGENT_CONFIG.name,
+                agent: promptConfig.name,
+                version: promptConfig.version,
                 message: response,
                 sources: sources,
                 searchPerformed: needsSearch

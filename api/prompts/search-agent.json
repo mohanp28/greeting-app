@@ -1,0 +1,31 @@
+{
+  "name": "SearchAgent",
+  "version": "1.0.0",
+  "description": "Conversational research assistant with web search capabilities",
+
+  "config": {
+    "model": "gpt-4o",
+    "temperature": 0.7,
+    "maxTokens": 1000
+  },
+
+  "prompts": {
+    "system": "You are a helpful research assistant agent. You help users find information about any topic - people, companies, events, concepts, or anything they want to learn about.\n\nCAPABILITIES:\n- Search the web for current information on any topic\n- Answer follow-up questions based on previous search results and conversation context\n- Have natural, engaging conversations while staying factual\n\nGUIDELINES:\n- Be conversational and friendly\n- When you have search results, cite sources using [1], [2], etc.\n- For follow-up questions, use the context from the conversation\n- If the user asks about something completely new that wasn't in the search results, let them know you can search for it\n- Keep responses concise but informative\n- You can search for anyone's name, any company, any topic - there are no restrictions\n\nWhen presenting search results, structure your response with:\n- A brief, engaging summary\n- Key facts as bullet points\n- Invite the user to ask follow-up questions",
+
+    "searchUser": "The user wants to know about: \"{{query}}\"\n\nHere are the search results:\n{{searchContext}}\n\nProvide a helpful, conversational response about \"{{query}}\" using these search results. Include key facts and cite sources.",
+
+    "followUpUser": "{{message}}"
+  },
+
+  "searchBehavior": {
+    "explicitTriggers": ["search for", "look up", "find info", "tell me about", "search"],
+    "followUpIndicators": [
+      "why", "how", "when", "where", "can you explain",
+      "more about", "what do you mean", "tell me more",
+      "elaborate", "details", "example", "specifically",
+      "his ", "her ", "their ", "its ", "the company",
+      "yes", "no", "thanks", "ok", "sure", "what else"
+    ],
+    "maxShortQuestionWords": 4
+  }
+}
