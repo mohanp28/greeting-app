@@ -7,6 +7,7 @@ const OpenAI = require('openai');
 // ============================================
 
 // Schema definitions (matching the Agent Builder output)
+// Note: additionalProperties: false is required at ALL object levels for strict mode
 const webResearchSchema = {
     type: "object",
     properties: {
@@ -23,11 +24,13 @@ const webResearchSchema = {
                     description: { type: "string" },
                     founded_year: { type: "number" }
                 },
-                required: ["company_name", "industry", "headquarters_location", "company_size", "website", "description", "founded_year"]
+                required: ["company_name", "industry", "headquarters_location", "company_size", "website", "description", "founded_year"],
+                additionalProperties: false
             }
         }
     },
-    required: ["companies"]
+    required: ["companies"],
+    additionalProperties: false
 };
 
 const summarizeSchema = {
@@ -41,7 +44,8 @@ const summarizeSchema = {
         description: { type: "string" },
         founded_year: { type: "number" }
     },
-    required: ["company_name", "industry", "headquarters_location", "company_size", "website", "description", "founded_year"]
+    required: ["company_name", "industry", "headquarters_location", "company_size", "website", "description", "founded_year"],
+    additionalProperties: false
 };
 
 // Agent configurations (matching Agent Builder)
