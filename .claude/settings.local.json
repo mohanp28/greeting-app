@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(echo:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(az version:*)",
+      "Bash(az account show:*)",
+      "Bash(az group create:*)",
+      "Bash(az staticwebapp create:*)",
+      "Bash(az provider register:*)",
+      "Bash(az provider show:*)",
+      "Bash(az staticwebapp --help:*)",
+      "Bash(export PATH=\"/tmp/node-v20.11.0-darwin-arm64/bin:$PATH\")",
+      "Bash(npm config set:*)"
+    ]
+  }
+}
