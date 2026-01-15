@@ -261,8 +261,8 @@
             <button class="modal-close" onclick="closeDocModal()">&times;</button>
             <h2>📄 Document Management</h2>
             <div class="upload-area" id="uploadArea">
-                <input type="file" id="fileInput" accept=".pdf,.txt,.md">
-                <p>📤 Drop PDF or text files here<br><small>or click to browse</small></p>
+                <input type="file" id="fileInput" accept=".txt,.md,.csv">
+                <p>📤 Drop text files here<br><small>.txt, .md, .csv supported</small></p>
             </div>
             <div class="upload-status" id="uploadStatus"></div>
             <div class="doc-list" id="docList">
@@ -469,31 +469,27 @@
         });
 
         async function uploadFile(file) {
+            // Check file type
+            const allowedTypes = ['.txt', '.md', '.csv'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+
+            if (!allowedTypes.includes(fileExt)) {
+                uploadStatus.textContent = `✗ Only text files supported (.txt, .md, .csv)`;
+                uploadStatus.className = 'upload-status error';
+                return;
+            }
+
             uploadStatus.textContent = `Uploading ${file.name}...`;
             uploadStatus.className = 'upload-status';
 
             try {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                // For PDF, send as binary
-                let response;
-                if (file.type === 'application/pdf') {
-                    const buffer = await file.arrayBuffer();
-                    response = await fetch(`/api/upload?op=upload&filename=${encodeURIComponent(file.name)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/pdf' },
-                        body: buffer
-                    });
-                } else {
-                    // For text files
-                    const text = await file.text();
-                    response = await fetch('/api/upload?op=upload', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: text, filename: file.name })
-                    });
-                }
+                // Read as text
+                const text = await file.text();
+                const response = await fetch('/api/upload?op=upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: text, filename: file.name })
+                });
 
                 const data = await response.json();
 
