@@ -81,7 +81,7 @@ function chunkText(text, chunkSize = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
         start = end - overlap;
     }
 
-    return chunks.filter(chunk => chunk.length > 50); // Filter out tiny chunks
+    return chunks.filter(chunk => chunk.length > 20); // Filter out very tiny chunks
 }
 
 async function getEmbedding(openai, text) {
@@ -206,22 +206,38 @@ module.exports = async function (context, req) {
 
             // Chunk the text
             const chunks = chunkText(text);
-            console.log(`Processing ${chunks.length} chunks for ${filename}`);
+            console.log(`Text length: ${text.length}, Chunks: ${chunks.length}`);
+
+            if (chunks.length === 0) {
+                // If no chunks, treat entire text as one chunk
+                chunks.push(text.substring(0, 5000)); // Limit to 5000 chars
+            }
 
             // Generate embeddings and prepare documents
             const documents = [];
             const timestamp = new Date().toISOString();
 
             for (let i = 0; i < chunks.length; i++) {
-                const embedding = await getEmbedding(openai, chunks[i]);
+                const chunkText = chunks[i];
+                if (!chunkText || chunkText.trim().length < 10) continue;
+
+                const embedding = await getEmbedding(openai, chunkText);
                 documents.push({
                     id: `${filename.replace(/[^a-zA-Z0-9]/g, '_')}_${i}_${Date.now()}`,
-                    content: chunks[i],
+                    content: chunkText,
                     embedding: embedding,
                     filename: filename,
                     chunkIndex: i,
                     uploadedAt: timestamp
                 });
+            }
+
+            if (documents.length === 0) {
+                context.res = {
+                    status: 400,
+                    body: { error: 'No valid content chunks to index. Text may be too short or empty.' }
+                };
+                return;
             }
 
             // Upload to Azure Search
