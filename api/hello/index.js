@@ -8,7 +8,7 @@ const AGENT_CONFIG = {
     name: 'SearchAgent',
     model: 'gpt-4o',
     temperature: 0.7,
-    maxTokens: 800
+    maxTokens: 1000
 };
 
 // ============================================
@@ -16,32 +16,34 @@ const AGENT_CONFIG = {
 // ============================================
 
 const PROMPTS = {
-    system: `You are a research assistant agent. Your task is to analyze search results and provide structured, factual summaries.
+    system: `You are a helpful research assistant agent. You help users find information about people, companies, topics, and events.
 
-RESPONSE FORMAT (you MUST follow this exact JSON structure):
-{
-    "name": "The searched topic/person/entity name",
-    "summary": "A 2-3 sentence overview",
-    "keyFacts": ["Fact 1", "Fact 2", "Fact 3", "Fact 4", "Fact 5"],
-    "category": "Person | Company | Topic | Event | Other",
-    "notableFor": "One sentence on why this is notable",
-    "relatedTopics": ["Related 1", "Related 2", "Related 3"]
-}
+CAPABILITIES:
+- Search the web for current information
+- Answer follow-up questions based on previous search results
+- Have natural conversations while staying factual
 
-RULES:
-- Always return valid JSON
-- Be factual and concise
-- Include 3-5 key facts
-- Cite sources using [1], [2] notation in the summary and facts
-- If information is uncertain, say "reportedly" or "according to sources"`,
+GUIDELINES:
+- Be conversational and friendly
+- When you have search results, cite sources using [1], [2], etc.
+- For follow-up questions, use the context from previous messages
+- If asked something outside your search results, say you'd need to search for that
+- Keep responses concise but informative
 
-    user: (query, searchContext) => `
-Research query: "${query}"
+When presenting initial search results, structure your response with:
+- A brief summary
+- Key facts as bullet points
+- Mention that the user can ask follow-up questions`,
 
-Search results:
+    searchUser: (query, searchContext) => `
+The user wants to know about: "${query}"
+
+Here are the search results:
 ${searchContext}
 
-Analyze these search results and provide a structured summary following the JSON format specified.`
+Provide a helpful, conversational response about "${query}" using these search results. Include key facts and cite sources.`,
+
+    followUpUser: (message) => `${message}`
 };
 
 // ============================================
@@ -73,6 +75,15 @@ const tools = {
         return results
             .map((r, i) => `[${i + 1}] ${r.title}\n${r.content}\nURL: ${r.url}`)
             .join('\n\n');
+    },
+
+    shouldSearch: (message, chatHistory) => {
+        // Search if it's the first message or explicitly asking to search
+        if (chatHistory.length === 0) return true;
+
+        const searchTriggers = ['search for', 'look up', 'find info', 'what is', 'who is', 'tell me about'];
+        const lowerMessage = message.toLowerCase();
+        return searchTriggers.some(trigger => lowerMessage.includes(trigger));
     }
 };
 
@@ -80,28 +91,43 @@ const tools = {
 // AGENT CLASS
 // ============================================
 
-class SearchAgent {
+class ConversationalAgent {
     constructor(openaiClient, config) {
         this.client = openaiClient;
         this.config = config;
     }
 
-    async run(query, searchResults) {
-        const searchContext = tools.formatSearchContext(searchResults);
+    async chat(userMessage, chatHistory, searchContext = null) {
+        // Build messages array with history
+        const messages = [
+            { role: 'system', content: PROMPTS.system }
+        ];
+
+        // Add chat history (limit to last 10 exchanges to manage tokens)
+        const recentHistory = chatHistory.slice(-20);
+        messages.push(...recentHistory);
+
+        // Add current user message with search context if available
+        if (searchContext) {
+            messages.push({
+                role: 'user',
+                content: PROMPTS.searchUser(userMessage, searchContext)
+            });
+        } else {
+            messages.push({
+                role: 'user',
+                content: PROMPTS.followUpUser(userMessage)
+            });
+        }
 
         const completion = await this.client.chat.completions.create({
             model: this.config.model,
             temperature: this.config.temperature,
             max_tokens: this.config.maxTokens,
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: PROMPTS.system },
-                { role: 'user', content: PROMPTS.user(query, searchContext) }
-            ]
+            messages: messages
         });
 
-        const response = JSON.parse(completion.choices[0].message.content);
-        return response;
+        return completion.choices[0].message.content;
     }
 }
 
@@ -110,8 +136,6 @@ class SearchAgent {
 // ============================================
 
 module.exports = async function (context, req) {
-    const query = req.query.name || 'World';
-
     const tavilyApiKey = process.env.TAVILY_API_KEY;
     const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -123,25 +147,56 @@ module.exports = async function (context, req) {
         return;
     }
 
+    // Support both GET (simple) and POST (with history)
+    let message, chatHistory;
+
+    if (req.method === 'POST') {
+        message = req.body.message || '';
+        chatHistory = req.body.chatHistory || [];
+    } else {
+        message = req.query.name || req.query.message || '';
+        chatHistory = [];
+    }
+
+    if (!message) {
+        context.res = {
+            status: 400,
+            body: { error: 'Message is required' }
+        };
+        return;
+    }
+
     try {
-        // Step 1: Execute web search tool
-        const searchData = await tools.webSearch(query, tavilyApiKey);
-
-        // Step 2: Initialize and run the agent
         const openai = new OpenAI({ apiKey: openaiApiKey });
-        const agent = new SearchAgent(openai, AGENT_CONFIG);
-        const agentResponse = await agent.run(query, searchData.results);
+        const agent = new ConversationalAgent(openai, AGENT_CONFIG);
 
-        // Step 3: Return structured response
+        let searchContext = null;
+        let sources = [];
+
+        // Determine if we need to search
+        const needsSearch = tools.shouldSearch(message, chatHistory);
+
+        if (needsSearch) {
+            // Extract search query (use message directly or parse it)
+            const searchQuery = message.replace(/^(search for|look up|find info about|tell me about|who is|what is)\s*/i, '');
+
+            const searchData = await tools.webSearch(searchQuery, tavilyApiKey);
+            searchContext = tools.formatSearchContext(searchData.results);
+            sources = searchData.results.map(r => ({
+                title: r.title,
+                url: r.url
+            }));
+        }
+
+        // Get agent response
+        const response = await agent.chat(message, chatHistory, searchContext);
+
         context.res = {
             body: {
                 agent: AGENT_CONFIG.name,
-                query: query,
-                response: agentResponse,
-                sources: searchData.results.map(r => ({
-                    title: r.title,
-                    url: r.url
-                }))
+                message: response,
+                sources: sources,
+                searchPerformed: needsSearch
             }
         };
 

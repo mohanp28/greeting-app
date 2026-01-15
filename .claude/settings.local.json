@@ -13,7 +13,16 @@
       "Bash(az provider show:*)",
       "Bash(az staticwebapp --help:*)",
       "Bash(export PATH=\"/tmp/node-v20.11.0-darwin-arm64/bin:$PATH\")",
-      "Bash(npm config set:*)"
+      "Bash(npm config set:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(gh auth status:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git add:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ]
   }
 }
