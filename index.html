@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Agent Chat</title>
+    <title>Search Agent with RAG</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -16,11 +16,24 @@
         .header {
             background: #0078d4;
             color: white;
-            padding: 16px 20px;
-            text-align: center;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .header h1 { font-size: 18px; font-weight: 600; }
-        .header p { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+        .header-left h1 { font-size: 18px; font-weight: 600; }
+        .header-left p { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+        .header-actions { display: flex; gap: 8px; }
+        .header-btn {
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .header-btn:hover { background: rgba(255,255,255,0.25); }
 
         .chat-container {
             flex: 1;
@@ -30,16 +43,11 @@
             margin: 0 auto;
             width: 100%;
         }
-        .message {
-            margin-bottom: 16px;
-            display: flex;
-            flex-direction: column;
-        }
+        .message { margin-bottom: 16px; display: flex; flex-direction: column; }
         .message.user { align-items: flex-end; }
         .message.agent { align-items: flex-start; }
-
         .message-bubble {
-            max-width: 80%;
+            max-width: 85%;
             padding: 12px 16px;
             border-radius: 16px;
             line-height: 1.5;
@@ -55,29 +63,29 @@
             border-bottom-left-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        .message-label {
-            font-size: 11px;
-            color: #666;
-            margin-bottom: 4px;
-            padding: 0 8px;
-        }
-        .sources {
+        .message-label { font-size: 11px; color: #666; margin-bottom: 4px; padding: 0 8px; }
+
+        .sources, .rag-sources {
             margin-top: 8px;
             padding-top: 8px;
             border-top: 1px solid #eee;
             font-size: 12px;
         }
-        .sources-title {
-            color: #666;
-            margin-bottom: 4px;
-        }
-        .sources a {
+        .sources-title { color: #666; margin-bottom: 4px; font-weight: 500; }
+        .sources a, .rag-sources span {
             display: block;
             color: #0078d4;
             text-decoration: none;
             padding: 2px 0;
         }
         .sources a:hover { text-decoration: underline; }
+        .rag-sources span {
+            color: #5c6bc0;
+            cursor: default;
+        }
+        .rag-sources span::before {
+            content: "📄 ";
+        }
 
         .input-container {
             background: white;
@@ -90,7 +98,7 @@
             display: flex;
             gap: 10px;
         }
-        input {
+        input[type="text"] {
             flex: 1;
             padding: 12px 16px;
             font-size: 15px;
@@ -98,7 +106,7 @@
             border-radius: 24px;
             outline: none;
         }
-        input:focus { border-color: #0078d4; }
+        input[type="text"]:focus { border-color: #0078d4; }
         button {
             padding: 12px 24px;
             font-size: 15px;
@@ -111,14 +119,9 @@
         button:hover { background: #106ebe; }
         button:disabled { background: #ccc; cursor: not-allowed; }
 
-        .typing-indicator {
-            display: flex;
-            gap: 4px;
-            padding: 12px 16px;
-        }
+        .typing-indicator { display: flex; gap: 4px; padding: 12px 16px; }
         .typing-indicator span {
-            width: 8px;
-            height: 8px;
+            width: 8px; height: 8px;
             background: #999;
             border-radius: 50%;
             animation: bounce 1.4s infinite ease-in-out;
@@ -131,19 +134,10 @@
             40% { transform: translateY(-6px); }
         }
 
-        .welcome {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
-        }
+        .welcome { text-align: center; padding: 40px 20px; color: #666; }
         .welcome h2 { color: #333; margin-bottom: 10px; }
         .welcome p { margin-bottom: 20px; }
-        .suggestions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-        }
+        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
         .suggestion {
             background: white;
             border: 1px solid #ddd;
@@ -151,63 +145,141 @@
             border-radius: 20px;
             cursor: pointer;
             font-size: 14px;
+        }
+        .suggestion:hover { border-color: #0078d4; color: #0078d4; }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal h2 { margin-bottom: 16px; }
+        .modal-close {
+            float: right;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            color: #666;
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 16px;
+            cursor: pointer;
             transition: all 0.2s;
         }
-        .suggestion:hover {
-            border-color: #0078d4;
-            color: #0078d4;
+        .upload-area:hover { border-color: #0078d4; background: #f8f9fa; }
+        .upload-area.dragover { border-color: #0078d4; background: #e3f2fd; }
+        .upload-area input { display: none; }
+        .upload-status { margin-top: 16px; font-size: 14px; }
+        .upload-status.success { color: #4caf50; }
+        .upload-status.error { color: #f44336; }
+        .doc-list { margin-top: 20px; }
+        .doc-list h3 { font-size: 14px; color: #666; margin-bottom: 10px; }
+        .doc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 8px;
         }
-        .new-chat {
-            font-size: 12px;
-            background: transparent;
+        .doc-item-name { font-size: 14px; }
+        .doc-item-delete {
+            background: #ff5252;
             color: white;
-            opacity: 0.8;
-            padding: 4px 12px;
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
         }
-        .new-chat:hover { opacity: 1; background: rgba(255,255,255,0.1); }
-        .header { position: relative; }
+        .rag-indicator {
+            background: #e8f5e9;
+            color: #2e7d32;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Search Agent</h1>
-        <p>Ask me anything - I'll search the web and answer your questions</p>
-        <button class="new-chat" onclick="clearChat()">New Chat</button>
+        <div class="header-left">
+            <h1>Search Agent</h1>
+            <p>Web search + Your documents (RAG)</p>
+        </div>
+        <div class="header-actions">
+            <button class="header-btn" onclick="openDocModal()">📄 Documents</button>
+            <button class="header-btn" onclick="clearChat()">New Chat</button>
+        </div>
     </div>
 
     <div class="chat-container" id="chatContainer">
         <div class="welcome" id="welcome">
             <h2>Hello! I'm your Search Agent</h2>
-            <p>I can search the web and answer follow-up questions. Try asking:</p>
+            <p>I can search the web AND your uploaded documents. Try asking:</p>
             <div class="suggestions">
                 <span class="suggestion" onclick="sendSuggestion('Elon Musk')">Elon Musk</span>
-                <span class="suggestion" onclick="sendSuggestion('OpenAI')">OpenAI</span>
-                <span class="suggestion" onclick="sendSuggestion('Latest tech news')">Latest tech news</span>
-                <span class="suggestion" onclick="sendSuggestion('Climate change')">Climate change</span>
+                <span class="suggestion" onclick="sendSuggestion('What is in my documents?')">My documents</span>
+                <span class="suggestion" onclick="sendSuggestion('Latest AI news')">Latest AI news</span>
             </div>
         </div>
     </div>
 
     <div class="input-container">
         <form class="input-wrapper" id="chatForm">
-            <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" required>
+            <input type="text" id="messageInput" placeholder="Ask anything..." autocomplete="off" required>
             <button type="submit" id="sendBtn">Send</button>
         </form>
     </div>
 
+    <!-- Document Upload Modal -->
+    <div class="modal-overlay" id="docModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeDocModal()">&times;</button>
+            <h2>📄 Document Management</h2>
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="fileInput" accept=".pdf,.txt,.md">
+                <p>📤 Drop PDF or text files here<br><small>or click to browse</small></p>
+            </div>
+            <div class="upload-status" id="uploadStatus"></div>
+            <div class="doc-list" id="docList">
+                <h3>Uploaded Documents</h3>
+                <div id="docItems">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Chat state
         let chatHistory = [];
         const chatContainer = document.getElementById('chatContainer');
-        const welcome = document.getElementById('welcome');
         const form = document.getElementById('chatForm');
         const input = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
 
+        // Chat functions
         function sendSuggestion(text) {
             input.value = text;
             form.dispatchEvent(new Event('submit'));
@@ -218,18 +290,16 @@
             chatContainer.innerHTML = `
                 <div class="welcome" id="welcome">
                     <h2>Hello! I'm your Search Agent</h2>
-                    <p>I can search the web and answer follow-up questions. Try asking:</p>
+                    <p>I can search the web AND your uploaded documents. Try asking:</p>
                     <div class="suggestions">
                         <span class="suggestion" onclick="sendSuggestion('Elon Musk')">Elon Musk</span>
-                        <span class="suggestion" onclick="sendSuggestion('OpenAI')">OpenAI</span>
-                        <span class="suggestion" onclick="sendSuggestion('Latest tech news')">Latest tech news</span>
-                        <span class="suggestion" onclick="sendSuggestion('Climate change')">Climate change</span>
+                        <span class="suggestion" onclick="sendSuggestion('What is in my documents?')">My documents</span>
+                        <span class="suggestion" onclick="sendSuggestion('Latest AI news')">Latest AI news</span>
                     </div>
                 </div>`;
         }
 
-        function addMessage(role, content, sources = []) {
-            // Remove welcome screen
+        function addMessage(role, content, sources = [], ragSources = [], ragUsed = false) {
             const welcomeEl = document.getElementById('welcome');
             if (welcomeEl) welcomeEl.remove();
 
@@ -240,20 +310,32 @@
             if (sources.length > 0) {
                 sourcesHtml = `
                     <div class="sources">
-                        <div class="sources-title">Sources:</div>
+                        <div class="sources-title">🌐 Web Sources:</div>
                         ${sources.map((s, i) => `<a href="${s.url}" target="_blank">[${i + 1}] ${s.title}</a>`).join('')}
                     </div>`;
             }
 
-            // Convert markdown-style formatting
+            let ragSourcesHtml = '';
+            if (ragSources.length > 0) {
+                const uniqueFiles = [...new Set(ragSources.map(s => s.filename))];
+                ragSourcesHtml = `
+                    <div class="rag-sources">
+                        <div class="sources-title">📄 Documents Used:</div>
+                        ${uniqueFiles.map(f => `<span>${f}</span>`).join('')}
+                    </div>`;
+            }
+
+            let ragIndicator = ragUsed ? '<span class="rag-indicator">RAG</span>' : '';
+
             let formattedContent = content
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
 
             messageDiv.innerHTML = `
-                <span class="message-label">${role === 'user' ? 'You' : 'Agent'}</span>
+                <span class="message-label">${role === 'user' ? 'You' : 'Agent'}${ragIndicator}</span>
                 <div class="message-bubble">
                     ${formattedContent}
+                    ${ragSourcesHtml}
                     ${sourcesHtml}
                 </div>`;
 
@@ -268,9 +350,7 @@
             typingDiv.innerHTML = `
                 <span class="message-label">Agent</span>
                 <div class="message-bubble">
-                    <div class="typing-indicator">
-                        <span></span><span></span><span></span>
-                    </div>
+                    <div class="typing-indicator"><span></span><span></span><span></span></div>
                 </div>`;
             chatContainer.appendChild(typingDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -286,48 +366,151 @@
             const message = input.value.trim();
             if (!message) return;
 
-            // Add user message to UI
             addMessage('user', message);
             input.value = '';
             sendBtn.disabled = true;
-
-            // Add to history
             chatHistory.push({ role: 'user', content: message });
-
-            // Show typing indicator
             showTyping();
 
             try {
                 const response = await fetch('/api/hello', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        chatHistory: chatHistory
-                    })
+                    body: JSON.stringify({ message, chatHistory })
                 });
 
                 const data = await response.json();
                 hideTyping();
 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Request failed');
-                }
+                if (!response.ok) throw new Error(data.error || 'Request failed');
 
-                // Add agent response to UI
-                addMessage('agent', data.message, data.sources);
-
-                // Add to history
+                addMessage('agent', data.message, data.sources || [], data.ragSources || [], data.ragUsed);
                 chatHistory.push({ role: 'assistant', content: data.message });
 
             } catch (error) {
                 hideTyping();
-                addMessage('agent', `Sorry, I encountered an error: ${error.message}`);
+                addMessage('agent', `Sorry, an error occurred: ${error.message}`);
             } finally {
                 sendBtn.disabled = false;
                 input.focus();
             }
         });
+
+        // Document modal functions
+        function openDocModal() {
+            document.getElementById('docModal').classList.add('active');
+            loadDocuments();
+        }
+
+        function closeDocModal() {
+            document.getElementById('docModal').classList.remove('active');
+        }
+
+        async function loadDocuments() {
+            const docItems = document.getElementById('docItems');
+            try {
+                const response = await fetch('/api/upload?op=list');
+                const data = await response.json();
+
+                if (data.documents && data.documents.length > 0) {
+                    docItems.innerHTML = data.documents.map(doc => `
+                        <div class="doc-item">
+                            <span class="doc-item-name">📄 ${doc.filename}</span>
+                            <button class="doc-item-delete" onclick="deleteDocument('${doc.filename}')">Delete</button>
+                        </div>
+                    `).join('');
+                } else {
+                    docItems.innerHTML = '<p style="color:#999;font-size:14px;">No documents uploaded yet</p>';
+                }
+            } catch (error) {
+                docItems.innerHTML = '<p style="color:#f44336;font-size:14px;">Failed to load documents</p>';
+            }
+        }
+
+        async function deleteDocument(filename) {
+            if (!confirm(`Delete "${filename}"?`)) return;
+
+            try {
+                const response = await fetch(`/api/upload?op=delete&filename=${encodeURIComponent(filename)}`);
+                const data = await response.json();
+                if (data.success) {
+                    loadDocuments();
+                }
+            } catch (error) {
+                alert('Failed to delete document');
+            }
+        }
+
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) uploadFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) uploadFile(fileInput.files[0]);
+        });
+
+        async function uploadFile(file) {
+            uploadStatus.textContent = `Uploading ${file.name}...`;
+            uploadStatus.className = 'upload-status';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // For PDF, send as binary
+                let response;
+                if (file.type === 'application/pdf') {
+                    const buffer = await file.arrayBuffer();
+                    response = await fetch(`/api/upload?op=upload&filename=${encodeURIComponent(file.name)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/pdf' },
+                        body: buffer
+                    });
+                } else {
+                    // For text files
+                    const text = await file.text();
+                    response = await fetch('/api/upload?op=upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: text, filename: file.name })
+                    });
+                }
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    uploadStatus.textContent = `✓ ${data.message}`;
+                    uploadStatus.className = 'upload-status success';
+                    loadDocuments();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                uploadStatus.textContent = `✗ Upload failed: ${error.message}`;
+                uploadStatus.className = 'upload-status error';
+            }
+
+            fileInput.value = '';
+        }
 
         input.focus();
     </script>
