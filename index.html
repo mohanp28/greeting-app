@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Agent with RAG</title>
+    <title>AI Agent Hub - Search + RAG + MCP + Salesforce</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -340,15 +340,190 @@
         }
         .step.active .step-number { background: #0078d4; color: white; }
         .step.complete .step-number { background: #4caf50; color: white; }
+
+        /* MCP styles */
+        .mcp-indicator {
+            background: #fff3e0;
+            color: #e65100;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+        .mcp-tools-used {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+        }
+        .mcp-tools-used .sources-title { color: #e65100; }
+        .mcp-tool-item {
+            background: #fff3e0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 4px 0;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        .mcp-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        .mcp-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        .mcp-status-dot.connected { background: #4caf50; }
+        .mcp-status-dot.disconnected { background: #f44336; }
+        .mcp-server-list {
+            margin-top: 16px;
+        }
+        .mcp-server-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .mcp-server-info { flex: 1; }
+        .mcp-server-name { font-weight: 600; color: #333; }
+        .mcp-server-tools { font-size: 12px; color: #666; margin-top: 4px; }
+        .mcp-connect-form {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+        .mcp-connect-form input {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .mcp-connect-form button {
+            padding: 10px 16px;
+            border-radius: 6px;
+        }
+
+        /* Salesforce styles */
+        .sf-indicator {
+            background: #e1f5fe;
+            color: #0277bd;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+        .sf-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sf-status-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .sf-status-icon.connected { background: #e8f5e9; }
+        .sf-status-icon.disconnected { background: #ffebee; }
+        .sf-status-info { flex: 1; }
+        .sf-status-title { font-weight: 600; color: #333; }
+        .sf-status-details { font-size: 13px; color: #666; margin-top: 4px; }
+        .sf-results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sf-results-table th {
+            background: #1976d2;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .sf-results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .sf-results-table tr:hover td {
+            background: #f5f5f5;
+        }
+        .sf-query-info {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+        .sf-query-info strong { color: #333; }
+        .sf-examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .sf-example {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #e0e0e0;
+        }
+        .sf-example:hover {
+            border-color: #1976d2;
+            box-shadow: 0 2px 8px rgba(25,118,210,0.2);
+        }
+        .sf-example-title { font-weight: 500; color: #1976d2; margin-bottom: 4px; }
+        .sf-example-desc { font-size: 12px; color: #666; }
+        .sf-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .sf-toggle label { font-size: 13px; color: #666; }
+        .sf-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-left">
             <h1>AI Agent Hub</h1>
-            <p>Search + RAG + Company Research</p>
+            <p>Search + RAG + MCP + Salesforce</p>
         </div>
         <div class="header-actions">
+            <button class="header-btn" onclick="openMCPModal()">🔌 MCP</button>
             <button class="header-btn" onclick="openDocModal()">📄 Documents</button>
             <button class="header-btn" onclick="clearChat()">Clear</button>
         </div>
@@ -356,7 +531,9 @@
 
     <div class="tabs">
         <button class="tab active" onclick="switchTab('chat')">💬 Chat Agent</button>
-        <button class="tab" onclick="switchTab('research')">🔍 Research Agent</button>
+        <button class="tab" onclick="switchTab('salesforce')">☁️ Salesforce</button>
+        <button class="tab" onclick="switchTab('research')">🔍 Research</button>
+        <button class="tab" onclick="switchTab('mcp')">🔌 MCP</button>
     </div>
 
     <!-- Chat Tab -->
@@ -381,6 +558,62 @@
         </div>
     </div>
 
+    <!-- Salesforce Tab -->
+    <div class="tab-content" id="salesforceTab">
+        <div class="research-container" id="sfContainer">
+            <h2 style="margin-bottom:8px;">☁️ Salesforce Query Agent</h2>
+            <p style="color:#666;margin-bottom:20px;">Query your Salesforce data using natural language. No SOQL knowledge required!</p>
+
+            <div class="sf-status" id="sfStatus">
+                <div class="sf-status-icon disconnected" id="sfStatusIcon">☁️</div>
+                <div class="sf-status-info">
+                    <div class="sf-status-title" id="sfStatusTitle">Checking connection...</div>
+                    <div class="sf-status-details" id="sfStatusDetails">Verifying Salesforce credentials</div>
+                </div>
+            </div>
+
+            <div class="sf-toggle">
+                <input type="checkbox" id="sfUseAI">
+                <label for="sfUseAI">Use AI for complex queries (slower but handles sophisticated requests)</label>
+            </div>
+
+            <div id="sfResultsArea">
+                <div class="sf-examples">
+                    <div class="sf-example" onclick="runSFQuery('show all accounts')">
+                        <div class="sf-example-title">Show Accounts</div>
+                        <div class="sf-example-desc">List all accounts with basic info</div>
+                    </div>
+                    <div class="sf-example" onclick="runSFQuery('open opportunities')">
+                        <div class="sf-example-title">Open Opportunities</div>
+                        <div class="sf-example-desc">View deals in progress</div>
+                    </div>
+                    <div class="sf-example" onclick="runSFQuery('pipeline forecast')">
+                        <div class="sf-example-title">Pipeline Forecast</div>
+                        <div class="sf-example-desc">See opportunity stages summary</div>
+                    </div>
+                    <div class="sf-example" onclick="runSFQuery('new leads')">
+                        <div class="sf-example-title">Recent Leads</div>
+                        <div class="sf-example-desc">Show newly created leads</div>
+                    </div>
+                    <div class="sf-example" onclick="runSFQuery('contacts at Acme')">
+                        <div class="sf-example-title">Find Contacts</div>
+                        <div class="sf-example-desc">Search contacts by company</div>
+                    </div>
+                    <div class="sf-example" onclick="runSFQuery('deals closing this month')">
+                        <div class="sf-example-title">Closing This Month</div>
+                        <div class="sf-example-desc">Opportunities closing soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="research-input-container">
+            <form class="input-wrapper" id="sfForm">
+                <input type="text" id="sfInput" placeholder="Ask about your Salesforce data... (e.g., 'show all accounts', 'open opportunities')" autocomplete="off" required>
+                <button type="submit" id="sfBtn">Query</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Research Tab -->
     <div class="tab-content" id="researchTab">
         <div class="research-container" id="researchContainer">
@@ -401,6 +634,45 @@
                 <input type="text" id="researchInput" placeholder="Enter company name to research..." autocomplete="off" required>
                 <button type="submit" id="researchBtn">Research</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MCP Tab -->
+    <div class="tab-content" id="mcpTab">
+        <div class="research-container">
+            <h2 style="margin-bottom:8px;">🔌 MCP - Model Context Protocol</h2>
+            <p style="color:#666;margin-bottom:20px;">Connect to external MCP servers to extend your agent's capabilities with additional tools.</p>
+
+            <div class="mcp-status" id="mcpStatus">
+                <span class="mcp-status-dot" id="mcpStatusDot"></span>
+                <span id="mcpStatusText">Loading...</span>
+            </div>
+
+            <div class="mcp-server-list" id="mcpServerList">
+                <!-- Server list will be populated here -->
+            </div>
+
+            <div class="mcp-connect-form">
+                <h3 style="margin-bottom:8px;">Connect to MCP Server</h3>
+                <input type="text" id="mcpServerName" placeholder="Server name (e.g., filesystem)">
+                <input type="text" id="mcpServerCommand" placeholder="Command (e.g., npx)">
+                <input type="text" id="mcpServerArgs" placeholder="Arguments (comma-separated, e.g., -y,@modelcontextprotocol/server-filesystem,/path)">
+                <button onclick="connectMCPServer()">Connect Server</button>
+            </div>
+
+            <div style="margin-top:24px;padding:16px;background:#e3f2fd;border-radius:8px;">
+                <h4 style="color:#1976d2;margin-bottom:8px;">What is MCP?</h4>
+                <p style="font-size:13px;color:#333;line-height:1.6;">
+                    Model Context Protocol (MCP) is Anthropic's open standard for connecting AI models to external data sources and tools.
+                    Once connected, MCP servers provide tools that your Chat Agent can use automatically.
+                </p>
+                <p style="font-size:13px;color:#666;margin-top:12px;">
+                    <strong>Example servers:</strong><br>
+                    • <code>@modelcontextprotocol/server-filesystem</code> - File system access<br>
+                    • <code>@modelcontextprotocol/server-github</code> - GitHub integration<br>
+                    • <code>@modelcontextprotocol/server-slack</code> - Slack messaging
+                </p>
+            </div>
         </div>
     </div>
 
@@ -448,7 +720,7 @@
                 </div>`;
         }
 
-        function addMessage(role, content, sources = [], ragSources = [], ragUsed = false) {
+        function addMessage(role, content, sources = [], ragSources = [], ragUsed = false, mcpToolsUsed = []) {
             const welcomeEl = document.getElementById('welcome');
             if (welcomeEl) welcomeEl.remove();
 
@@ -475,15 +747,26 @@
             }
 
             let ragIndicator = ragUsed ? '<span class="rag-indicator">RAG</span>' : '';
+            let mcpIndicator = mcpToolsUsed && mcpToolsUsed.length > 0 ? '<span class="mcp-indicator">MCP</span>' : '';
+
+            let mcpToolsHtml = '';
+            if (mcpToolsUsed && mcpToolsUsed.length > 0) {
+                mcpToolsHtml = `
+                    <div class="mcp-tools-used">
+                        <div class="sources-title">🔌 MCP Tools Used:</div>
+                        ${mcpToolsUsed.map(t => `<div class="mcp-tool-item">${t.tool}</div>`).join('')}
+                    </div>`;
+            }
 
             let formattedContent = content
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
 
             messageDiv.innerHTML = `
-                <span class="message-label">${role === 'user' ? 'You' : 'Agent'}${ragIndicator}</span>
+                <span class="message-label">${role === 'user' ? 'You' : 'Agent'}${ragIndicator}${mcpIndicator}</span>
                 <div class="message-bubble">
                     ${formattedContent}
+                    ${mcpToolsHtml}
                     ${ragSourcesHtml}
                     ${sourcesHtml}
                 </div>`;
@@ -533,7 +816,7 @@
 
                 if (!response.ok) throw new Error(data.error || 'Request failed');
 
-                addMessage('agent', data.message, data.sources || [], data.ragSources || [], data.ragUsed);
+                addMessage('agent', data.message, data.sources || [], data.ragSources || [], data.ragUsed, data.mcpToolsUsed || []);
                 chatHistory.push({ role: 'assistant', content: data.message });
 
             } catch (error) {
@@ -668,12 +951,244 @@
                 document.querySelector('.tab:nth-child(1)').classList.add('active');
                 document.getElementById('chatTab').classList.add('active');
                 input.focus();
-            } else {
+            } else if (tabName === 'salesforce') {
                 document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('salesforceTab').classList.add('active');
+                document.getElementById('sfInput').focus();
+                loadSFStatus();
+            } else if (tabName === 'research') {
+                document.querySelector('.tab:nth-child(3)').classList.add('active');
                 document.getElementById('researchTab').classList.add('active');
                 document.getElementById('researchInput').focus();
+            } else if (tabName === 'mcp') {
+                document.querySelector('.tab:nth-child(4)').classList.add('active');
+                document.getElementById('mcpTab').classList.add('active');
+                loadMCPStatus();
             }
         }
+
+        // MCP functions
+        function openMCPModal() {
+            switchTab('mcp');
+        }
+
+        async function loadMCPStatus() {
+            const statusDot = document.getElementById('mcpStatusDot');
+            const statusText = document.getElementById('mcpStatusText');
+            const serverList = document.getElementById('mcpServerList');
+
+            try {
+                const response = await fetch('/api/mcp');
+                const data = await response.json();
+
+                const toolCount = data.toolCount || 0;
+                const servers = Object.keys(data.status || {});
+
+                if (servers.length > 0) {
+                    statusDot.className = 'mcp-status-dot connected';
+                    statusText.textContent = `${servers.length} server(s) connected, ${toolCount} tools available`;
+
+                    serverList.innerHTML = servers.map(name => {
+                        const server = data.status[name];
+                        return `
+                            <div class="mcp-server-item">
+                                <div class="mcp-server-info">
+                                    <div class="mcp-server-name">${name}</div>
+                                    <div class="mcp-server-tools">${server.toolCount} tools • ${server.connected ? 'Connected' : 'Disconnected'}</div>
+                                </div>
+                                <span class="mcp-status-dot ${server.connected ? 'connected' : 'disconnected'}"></span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Show tools
+                    if (data.tools && data.tools.length > 0) {
+                        serverList.innerHTML += `
+                            <div style="margin-top:16px;">
+                                <h4 style="color:#666;margin-bottom:8px;">Available Tools</h4>
+                                ${data.tools.map(t => `
+                                    <div class="mcp-tool-item" style="margin:4px 0;">${t.name} - ${t.description || 'No description'}</div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                } else {
+                    statusDot.className = 'mcp-status-dot disconnected';
+                    statusText.textContent = 'No MCP servers connected';
+                    serverList.innerHTML = '<p style="color:#999;font-size:14px;">Connect an MCP server to extend your agent with external tools.</p>';
+                }
+            } catch (error) {
+                statusDot.className = 'mcp-status-dot disconnected';
+                statusText.textContent = 'Failed to load MCP status';
+                serverList.innerHTML = `<p style="color:#f44336;font-size:14px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function connectMCPServer() {
+            const name = document.getElementById('mcpServerName').value.trim();
+            const command = document.getElementById('mcpServerCommand').value.trim();
+            const argsStr = document.getElementById('mcpServerArgs').value.trim();
+
+            if (!name || !command) {
+                alert('Server name and command are required');
+                return;
+            }
+
+            const args = argsStr ? argsStr.split(',').map(a => a.trim()) : [];
+
+            try {
+                const response = await fetch('/api/mcp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'connect',
+                        server: { name, command, args }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`Connected to ${name}! ${data.tools?.length || 0} tools available.`);
+                    document.getElementById('mcpServerName').value = '';
+                    document.getElementById('mcpServerCommand').value = '';
+                    document.getElementById('mcpServerArgs').value = '';
+                    loadMCPStatus();
+                } else {
+                    alert(`Failed to connect: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Connection error: ${error.message}`);
+            }
+        }
+
+        // Salesforce functions
+        const sfForm = document.getElementById('sfForm');
+        const sfInput = document.getElementById('sfInput');
+        const sfBtn = document.getElementById('sfBtn');
+        const sfResultsArea = document.getElementById('sfResultsArea');
+
+        async function loadSFStatus() {
+            const icon = document.getElementById('sfStatusIcon');
+            const title = document.getElementById('sfStatusTitle');
+            const details = document.getElementById('sfStatusDetails');
+
+            try {
+                const response = await fetch('/api/salesforce?action=status');
+                const data = await response.json();
+
+                if (data.connected) {
+                    icon.className = 'sf-status-icon connected';
+                    title.textContent = 'Connected to Salesforce';
+                    details.textContent = data.organization?.Name
+                        ? `Organization: ${data.organization.Name}`
+                        : data.instanceUrl;
+                } else {
+                    icon.className = 'sf-status-icon disconnected';
+                    title.textContent = 'Salesforce Not Connected';
+                    details.textContent = 'Configure SALESFORCE_INSTANCE_URL and SALESFORCE_ACCESS_TOKEN';
+                }
+            } catch (error) {
+                icon.className = 'sf-status-icon disconnected';
+                title.textContent = 'Connection Error';
+                details.textContent = error.message;
+            }
+        }
+
+        function runSFQuery(query) {
+            sfInput.value = query;
+            sfForm.dispatchEvent(new Event('submit'));
+        }
+
+        function displaySFResults(data) {
+            let html = '';
+
+            if (data.soql) {
+                html += `
+                    <div class="sf-query-info">
+                        <strong>SOQL:</strong> ${data.soql}<br>
+                        <strong>Records:</strong> ${data.totalRecords}
+                        ${data.conversion?.aiGenerated ? ' <span class="sf-indicator">AI Generated</span>' : ''}
+                    </div>
+                `;
+            }
+
+            if (data.records && data.records.length > 0) {
+                // Get all unique keys from records
+                const keys = [...new Set(data.records.flatMap(r => Object.keys(r)))];
+
+                html += `<table class="sf-results-table">`;
+                html += `<thead><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr></thead>`;
+                html += `<tbody>`;
+
+                for (const record of data.records) {
+                    html += '<tr>';
+                    for (const key of keys) {
+                        let value = record[key];
+                        if (value && typeof value === 'object') {
+                            value = value.Name || JSON.stringify(value);
+                        }
+                        html += `<td>${value ?? ''}</td>`;
+                    }
+                    html += '</tr>';
+                }
+
+                html += '</tbody></table>';
+            } else {
+                html += '<p style="text-align:center;color:#666;padding:40px;">No records found</p>';
+            }
+
+            sfResultsArea.innerHTML = html;
+        }
+
+        sfForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = sfInput.value.trim();
+            if (!query) return;
+
+            sfBtn.disabled = true;
+            sfResultsArea.innerHTML = `
+                <div style="text-align:center;padding:40px;">
+                    <div class="typing-indicator" style="justify-content:center;">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <p style="color:#666;margin-top:16px;">Querying Salesforce...</p>
+                </div>
+            `;
+
+            try {
+                const useAI = document.getElementById('sfUseAI').checked;
+                const response = await fetch('/api/salesforce', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, useAI })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Query failed');
+                }
+
+                displaySFResults(data);
+
+            } catch (error) {
+                sfResultsArea.innerHTML = `
+                    <div style="text-align:center;padding:40px;color:#f44336;">
+                        <p>Query failed: ${error.message}</p>
+                        ${error.message.includes('not configured') ? `
+                            <p style="font-size:13px;color:#666;margin-top:12px;">
+                                Set environment variables:<br>
+                                SALESFORCE_INSTANCE_URL<br>
+                                SALESFORCE_ACCESS_TOKEN
+                            </p>
+                        ` : ''}
+                    </div>
+                `;
+            } finally {
+                sfBtn.disabled = false;
+            }
+        });
 
         // Research Agent functionality
         const researchForm = document.getElementById('researchForm');

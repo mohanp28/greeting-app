@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const { SearchClient, AzureKeyCredential } = require('@azure/search-documents');
 const fs = require('fs');
 const path = require('path');
+const { getMCPManager } = require('../mcp/client');
 
 // ============================================
 // PROMPT LOADER (supports local + Azure Blob)
@@ -209,7 +210,7 @@ const tools = {
 };
 
 // ============================================
-// AGENT CLASS
+// AGENT CLASS (with MCP Tool Support)
 // ============================================
 
 class ConversationalAgent {
@@ -217,15 +218,23 @@ class ConversationalAgent {
         this.client = openaiClient;
         this.config = config;
         this.prompts = prompts;
+        this.mcpManager = getMCPManager();
     }
 
     async chat(userMessage, chatHistory, context) {
-        const { searchContext, ragContext, promptLoader } = context;
+        const { searchContext, ragContext, promptLoader, useMCPTools } = context;
 
-        // Build system prompt with RAG awareness
+        // Build system prompt with RAG and MCP awareness
         let systemPrompt = this.prompts.system;
         if (ragContext) {
             systemPrompt += '\n\nYou also have access to uploaded documents. When answering from documents, cite them as [DOC 1], [DOC 2], etc.';
+        }
+
+        // Add MCP tools info if available
+        const mcpTools = this.mcpManager.getTools();
+        if (useMCPTools && mcpTools.length > 0) {
+            systemPrompt += '\n\nYou have access to external tools via MCP (Model Context Protocol). Available tools:\n';
+            systemPrompt += mcpTools.map(t => `- ${t.fullName}: ${t.description || 'No description'}`).join('\n');
         }
 
         const messages = [
@@ -268,6 +277,11 @@ Answer based on the documents above. Cite as [DOC 1], [DOC 2], etc.`;
 
         messages.push({ role: 'user', content: userPrompt });
 
+        // If MCP tools are available and enabled, use function calling
+        if (useMCPTools && mcpTools.length > 0) {
+            return await this.chatWithTools(messages, mcpTools);
+        }
+
         const completion = await this.client.chat.completions.create({
             model: this.config.model,
             temperature: this.config.temperature,
@@ -276,6 +290,109 @@ Answer based on the documents above. Cite as [DOC 1], [DOC 2], etc.`;
         });
 
         return completion.choices[0].message.content;
+    }
+
+    /**
+     * Chat with MCP tool calling support
+     */
+    async chatWithTools(messages, mcpTools) {
+        const openaiTools = this.mcpManager.getToolsForOpenAI();
+
+        let completion = await this.client.chat.completions.create({
+            model: this.config.model,
+            temperature: this.config.temperature,
+            max_tokens: this.config.maxTokens,
+            messages: messages,
+            tools: openaiTools,
+            tool_choice: 'auto'
+        });
+
+        let responseMessage = completion.choices[0].message;
+        const toolResults = [];
+
+        // Handle tool calls (max 5 iterations to prevent infinite loops)
+        let iterations = 0;
+        while (responseMessage.tool_calls && iterations < 5) {
+            iterations++;
+            messages.push(responseMessage);
+
+            // Execute each tool call
+            for (const toolCall of responseMessage.tool_calls) {
+                const toolName = toolCall.function.name;
+                let toolArgs = {};
+
+                try {
+                    toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+                } catch (e) {
+                    console.error('Failed to parse tool arguments:', e);
+                }
+
+                console.log(`[MCP] Executing tool: ${toolName}`, toolArgs);
+
+                try {
+                    const result = await this.mcpManager.executeTool(toolName, toolArgs);
+                    const resultContent = this.formatToolResult(result);
+
+                    toolResults.push({
+                        tool: toolName,
+                        result: resultContent
+                    });
+
+                    messages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: resultContent
+                    });
+                } catch (error) {
+                    console.error(`[MCP] Tool execution failed: ${toolName}`, error);
+                    messages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: `Error: ${error.message}`
+                    });
+                }
+            }
+
+            // Get next response
+            completion = await this.client.chat.completions.create({
+                model: this.config.model,
+                temperature: this.config.temperature,
+                max_tokens: this.config.maxTokens,
+                messages: messages,
+                tools: openaiTools,
+                tool_choice: 'auto'
+            });
+
+            responseMessage = completion.choices[0].message;
+        }
+
+        return {
+            content: responseMessage.content,
+            toolsUsed: toolResults
+        };
+    }
+
+    /**
+     * Format MCP tool result for the LLM
+     */
+    formatToolResult(result) {
+        if (!result || !result.content) {
+            return 'No result returned';
+        }
+
+        // MCP tool results have a content array
+        return result.content
+            .map(item => {
+                if (item.type === 'text') {
+                    return item.text;
+                } else if (item.type === 'image') {
+                    return `[Image: ${item.mimeType}]`;
+                } else if (item.type === 'resource') {
+                    return `[Resource: ${item.resource?.uri}]`;
+                }
+                return JSON.stringify(item);
+            })
+            .join('\n');
     }
 }
 
@@ -379,22 +496,35 @@ module.exports = async function (context, req) {
             }
         }
 
+        // Check if MCP tools should be used
+        const mcpManager = getMCPManager();
+        const mcpTools = mcpManager.getTools();
+        const useMCPTools = mcpTools.length > 0;
+
         // Get agent response
         const response = await agent.chat(message, chatHistory, {
             searchContext,
             ragContext,
-            promptLoader
+            promptLoader,
+            useMCPTools
         });
+
+        // Handle response (may be string or object with toolsUsed)
+        const isToolResponse = typeof response === 'object' && response.content;
+        const messageContent = isToolResponse ? response.content : response;
+        const toolsUsed = isToolResponse ? response.toolsUsed : [];
 
         context.res = {
             body: {
                 agent: promptConfig.name,
                 version: promptConfig.version,
-                message: response,
+                message: messageContent,
                 sources: sources,
                 ragSources: ragSources,
                 searchPerformed: needsSearch,
-                ragUsed: !!ragContext
+                ragUsed: !!ragContext,
+                mcpToolsAvailable: mcpTools.length,
+                mcpToolsUsed: toolsUsed
             }
         };
 
